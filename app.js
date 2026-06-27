@@ -15,6 +15,7 @@ const featuredDemon = document.querySelector("#featuredDemon");
 const demonGrid = document.querySelector("#demonGrid");
 const battleFrame = document.querySelector("#battleFrame");
 const resultFrame = document.querySelector("#resultFrame");
+const heroNameInput = document.querySelector("#heroName");
 
 let storyIndex = 0;
 let selectedCharacter = "Your name";
@@ -39,6 +40,54 @@ function setFrameScale() {
   document.documentElement.style.setProperty("--frame-scale", safeScale.toFixed(4));
   document.documentElement.style.setProperty("--stage-width", `${frameWidth * safeScale}px`);
   document.documentElement.style.setProperty("--stage-height", `${frameHeight * safeScale}px`);
+}
+
+const inviteParams = new URLSearchParams(window.location.search);
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function getInviteValue(...keys) {
+  for (const key of keys) {
+    const value = inviteParams.get(key);
+    if (value) return value.trim();
+  }
+  return "";
+}
+
+function findByName(items, name) {
+  return items.find((item) => item.name.toLowerCase() === name.toLowerCase());
+}
+
+function applyInviteParams() {
+  const name = getInviteValue("name", "guest", "player").slice(0, 18);
+  const companion = findByName(companions, getInviteValue("companion"));
+  const demon = findByName(demons, getInviteValue("demon"));
+
+  if (name && heroNameInput) {
+    heroNameInput.value = name;
+    heroNameInput.placeholder = name;
+  }
+
+  if (companion) selectedCompanion = companion.name;
+  if (demon) selectedDemon = demon.name;
+}
+
+function getInviteStartScreen() {
+  const screen = getInviteValue("screen").toLowerCase();
+  const mode = getInviteValue("mode").toLowerCase();
+
+  if (mode === "fight") return "fight";
+  if (mode === "date") return "date";
+  if (["story", "character", "companion", "home", "demons", "fight", "date"].includes(screen)) return screen;
+  if (inviteParams.get("skipIntro") === "1") return "home";
+  return "story";
 }
 
 const characters = [
@@ -857,7 +906,7 @@ function getTimeOfDay(date = new Date()) {
 
 function isAfterThreeAM(date = new Date()) {
   if (document.documentElement.dataset.previewTime === "late") return true;
-  if (new URLSearchParams(window.location.search).get("previewTime") === "late") return true;
+  if (inviteParams.get("previewTime") === "late") return true;
   const hour = date.getHours();
   return hour >= 3 && hour < 5;
 }
@@ -994,6 +1043,102 @@ function generateDateLine(demon, userText = "") {
   return generateVoiceLine(demonDateVoices, demon, userText);
 }
 
+function canUseGeminiChat() {
+  return window.location.protocol === "http:" || window.location.protocol === "https:";
+}
+
+function createDemonMessage(text) {
+  return canUseGeminiChat()
+    ? { text: "", type: "demon", pending: true }
+    : { text, type: "demon" };
+}
+
+function createGeneratedDemonMessage(fallbackText) {
+  return canUseGeminiChat()
+    ? { text: "", type: "demon", pending: true }
+    : { text: fallbackText, type: "demon" };
+}
+
+async function requestGeminiLine(battle, userText = "", phase = "reply") {
+  if (!canUseGeminiChat()) return "";
+
+  try {
+    const response = await fetch("/api/demon-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: battle.mode,
+        phase,
+        demonName: battle.demonName,
+        tags: battle.demon?.tags || [],
+        attackContext: battle.attackContext || "",
+        userText,
+        messages: battle.messages,
+      }),
+    });
+
+    if (!response.ok) return "";
+    const data = await response.json();
+    return data.reply || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function refreshBattleChat(battle, showClarifier = true) {
+  if (battle !== currentBattle) return;
+  const chat = battleFrame.querySelector(".battle-chat");
+  if (!chat) return;
+  chat.innerHTML = renderBattleMessages(battle.messages, showClarifier ? battle : null);
+  if (showClarifier) wireAttackOptions();
+}
+
+function chooseAttackOption(optionIndex) {
+  const option = currentBattle?.attackOptions?.[optionIndex];
+  if (!option || !currentBattle.awaitingClarification) return;
+
+  currentBattle.attackContext = option.label;
+  currentBattle.awaitingClarification = false;
+  currentBattle.messages.push({ text: option.label, type: "demon" });
+  const demonMessage = createGeneratedDemonMessage(generateContextualDemonLine(currentBattle, option.label));
+  currentBattle.messages.push(demonMessage);
+  refreshBattleChat(currentBattle);
+  hydrateGeminiBubble(currentBattle, demonMessage, option.label);
+
+  const input = battleFrame.querySelector(".battle-input input");
+  const send = battleFrame.querySelector(".battle-input button");
+  input.disabled = false;
+  send.disabled = false;
+  input.focus();
+}
+
+function wireAttackOptions() {
+  battleFrame.querySelectorAll("[data-attack-option]").forEach((button) => {
+    if (button.dataset.wired === "true") return;
+    button.dataset.wired = "true";
+    button.addEventListener("click", () => chooseAttackOption(Number(button.dataset.attackOption)));
+  });
+}
+
+function hydrateGeminiBubble(battle, message, userText = "", phase = "reply", showClarifier = true) {
+  requestGeminiLine(battle, userText, phase).then((reply) => {
+    if (battle !== currentBattle) return;
+    if (reply) {
+      message.text = reply;
+    } else if (!message.text) {
+      message.text = "The thought circles quietly...";
+    }
+    message.pending = false;
+    refreshBattleChat(battle, showClarifier);
+  });
+}
+
+function hydrateOpeningLine(battle, showClarifier = true) {
+  const opening = battle.messages[0];
+  if (!opening) return;
+  hydrateGeminiBubble(battle, opening, "", "opening", showClarifier);
+}
+
 function createBattleState(demon) {
   const character = characters.find((item) => item.name === selectedCharacter) || characters[0];
   return {
@@ -1008,7 +1153,7 @@ function createBattleState(demon) {
     attackContext: "",
     contextReplyCursor: 0,
     awaitingClarification: true,
-    messages: [{ text: generateDemonLine(demon), type: "demon" }],
+    messages: [createDemonMessage(generateDemonLine(demon))],
   };
 }
 
@@ -1020,7 +1165,7 @@ function createDatingState(demon) {
     demonImage: demon.image,
     heroImage: "./assets/characters/1 curious.png",
     relationshipStatus: "Stranger",
-    messages: [{ text: generateDateLine(demon), type: "demon" }],
+    messages: [createDemonMessage(generateDateLine(demon))],
   };
 }
 
@@ -1052,12 +1197,16 @@ function renderHeartMeter(count, total = 3) {
   </div>`;
 }
 
-function renderChatBubble(text, type, faded = false) {
-  return `<div class="chat-bubble chat-bubble--${type} ${faded ? "is-faded" : ""}">${text}</div>`;
+function renderChatBubble(message, faded = false) {
+  const pendingClass = message.pending ? "is-pending" : "";
+  const fadedClass = faded ? "is-faded" : "";
+  const text = message.pending ? "" : message.text;
+  return `<div class="chat-bubble chat-bubble--${message.type} ${fadedClass} ${pendingClass}">${escapeHtml(text)}</div>`;
 }
 
 function renderAttackClarifier(example) {
   if (!example.awaitingClarification || !example.attackOptions?.length) return "";
+  if (example.messages.at(-1)?.pending) return "";
 
   return `
     <div class="attack-clarifier" aria-label="Choose attack type">
@@ -1187,32 +1336,13 @@ function renderBattleScreen(example) {
     if (!input.value.trim()) return;
     const userText = input.value.trim();
     currentBattle.messages.push({ text: userText, type: "user" });
-    currentBattle.messages.push({
-      text: generateContextualDemonLine(currentBattle, userText),
-      type: "demon",
-    });
-    battleFrame.querySelector(".battle-chat").innerHTML = renderBattleMessages(currentBattle.messages, currentBattle);
+    const demonMessage = createGeneratedDemonMessage(generateContextualDemonLine(currentBattle, userText));
+    currentBattle.messages.push(demonMessage);
+    refreshBattleChat(currentBattle);
+    hydrateGeminiBubble(currentBattle, demonMessage, userText);
     input.value = "";
   });
-  battleFrame.querySelectorAll("[data-attack-option]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const option = currentBattle.attackOptions[Number(button.dataset.attackOption)];
-      if (!option) return;
-      currentBattle.attackContext = option.label;
-      currentBattle.awaitingClarification = false;
-      currentBattle.messages.push({ text: option.label, type: "demon" });
-      currentBattle.messages.push({
-        text: generateContextualDemonLine(currentBattle, option.label),
-        type: "demon",
-      });
-      battleFrame.querySelector(".battle-chat").innerHTML = renderBattleMessages(currentBattle.messages, currentBattle);
-      const input = battleFrame.querySelector(".battle-input input");
-      const send = battleFrame.querySelector(".battle-input button");
-      input.disabled = false;
-      send.disabled = false;
-      input.focus();
-    });
-  });
+  wireAttackOptions();
   battleFrame.querySelectorAll("[data-suggestion]").forEach((button) => {
     button.addEventListener("click", () => {
       const input = battleFrame.querySelector(".battle-input input");
@@ -1221,6 +1351,7 @@ function renderBattleScreen(example) {
     });
   });
 
+  hydrateOpeningLine(example);
   startBattleTimer();
 }
 
@@ -1257,8 +1388,10 @@ function renderDatingScreen(example) {
     if (!input.value.trim()) return;
     const userText = input.value.trim();
     currentBattle.messages.push({ text: userText, type: "user" });
-    currentBattle.messages.push({ text: generateDateLine(currentBattle.demon, userText), type: "demon" });
-    battleFrame.querySelector(".battle-chat").innerHTML = renderBattleMessages(currentBattle.messages);
+    const demonMessage = createGeneratedDemonMessage(generateDateLine(currentBattle.demon, userText));
+    currentBattle.messages.push(demonMessage);
+    refreshBattleChat(currentBattle, false);
+    hydrateGeminiBubble(currentBattle, demonMessage, userText, "reply", false);
     input.value = "";
   });
   battleFrame.querySelectorAll("[data-suggestion]").forEach((button) => {
@@ -1269,6 +1402,7 @@ function renderDatingScreen(example) {
     });
   });
 
+  hydrateOpeningLine(example, false);
   startBattleTimer();
 }
 
@@ -1277,7 +1411,7 @@ function renderBattleMessages(messages, example = null) {
   return `${visibleMessages
     .map((message, index) => {
       const isFaded = visibleMessages.length > 2 && index === 0;
-      return renderChatBubble(message.text, message.type, isFaded);
+      return renderChatBubble(message, isFaded);
     })
     .join("")}${example ? renderAttackClarifier(example) : ""}`;
 }
@@ -1317,6 +1451,7 @@ function renderResultScreen(example) {
 }
 
 function boot() {
+  applyInviteParams();
   setFrameScale();
   renderStory();
   renderChoices(characterCarousel, characters, selectedCharacter, (name) => {
@@ -1354,6 +1489,23 @@ function boot() {
   document.querySelector(".round-back").addEventListener("click", () => {
     showScreen("home");
   });
+
+  const startScreen = getInviteStartScreen();
+  if (startScreen === "home") {
+    updateHomebase();
+    showScreen("home");
+  } else if (startScreen === "demons") {
+    renderDemons();
+    showScreen("demons");
+  } else if (startScreen === "fight") {
+    renderBattleScreen(createBattleState(getDemonByName(selectedDemon)));
+    showScreen("battle");
+  } else if (startScreen === "date") {
+    renderDatingScreen(createDatingState(getDemonByName(selectedDemon)));
+    showScreen("battle");
+  } else if (startScreen !== "story") {
+    showScreen(startScreen);
+  }
 }
 
 window.addEventListener("resize", setFrameScale);

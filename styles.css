@@ -1484,7 +1484,7 @@ button {
   justify-content: flex-end;
   gap: 12px;
   overflow: hidden;
-  pointer-events: none;
+  pointer-events: auto;
   animation: chatStackPush 340ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
 }
 
@@ -1504,12 +1504,41 @@ button {
   font-weight: 700;
   line-height: 1;
   opacity: var(--bubble-opacity);
+  pointer-events: none;
   transform-origin: 50% 100%;
   animation: chatBubbleIn 360ms cubic-bezier(0.2, 0.9, 0.2, 1.08) both;
 }
 
 .chat-bubble.is-faded {
   --bubble-opacity: 0.22;
+}
+
+.chat-bubble.is-pending {
+  width: 86px;
+  height: 46px;
+  position: relative;
+}
+
+.chat-bubble.is-pending::before,
+.chat-bubble.is-pending::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  transform: translateY(-50%);
+  animation: pendingDot 900ms ease-in-out infinite;
+}
+
+.chat-bubble.is-pending::before {
+  left: 30px;
+}
+
+.chat-bubble.is-pending::after {
+  left: 48px;
+  animation-delay: 160ms;
 }
 
 .chat-bubble--user {
@@ -1790,6 +1819,18 @@ button {
     transform: translateY(0);
     filter: blur(0);
     color: white;
+  }
+}
+
+@keyframes pendingDot {
+  0%, 100% {
+    opacity: 0.28;
+    transform: translateY(-50%) scale(0.75);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
   }
 }
 
