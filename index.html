@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slay</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-live="polite">
+      <section class="screen screen-story is-active" data-screen="story">
+        <div class="phone-frame story-frame">
+          <div class="story-card is-active" data-story="0">
+            <div class="haze haze-soft"></div>
+            <div class="wisp wisp-one"></div>
+            <div class="story-copy">
+              <p>Are there things<br />you keep putting off?</p>
+            </div>
+          </div>
+          <div class="story-card" data-story="1">
+            <div class="haze haze-tall"></div>
+            <div class="story-copy">
+              <p>Not because you're lazy...</p>
+              <p>Because something<br />in you pushes back?</p>
+            </div>
+          </div>
+          <div class="story-card" data-story="2">
+            <div class="shadow-demon"></div>
+            <div class="wisp trail-a"></div>
+            <div class="wisp trail-b"></div>
+            <div class="wisp trail-c"></div>
+            <div class="story-copy">
+              <p>You might be up<br />against some demons.</p>
+            </div>
+          </div>
+          <div class="story-card story-card-list" data-story="3">
+            <div class="story-copy">
+              <p>Fight them.</p>
+              <p>Sit with them.</p>
+              <p>Date them,<br />if you want.</p>
+              <p>But let's not pretend<br />they're not there.</p>
+            </div>
+          </div>
+          <div class="story-card story-card-final" data-story="4">
+            <div class="story-copy">
+              <p>However you show up...</p>
+              <p>you're still slaying <span aria-hidden="true">✦</span></p>
+            </div>
+            <button class="pill-button story-start" type="button">let's go slay</button>
+          </div>
+          <button class="tap-layer" type="button" aria-label="Continue intro"></button>
+          <div class="progress-dots" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="screen picker-screen" data-screen="character">
+        <div class="phone-frame picker-frame">
+          <header class="picker-header">
+            <h1>Choose your<br />character</h1>
+            <button class="round-next" type="button" aria-label="Choose companion">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h13M13 6l6 6-6 6" />
+              </svg>
+            </button>
+          </header>
+          <div class="carousel" id="characterCarousel"></div>
+          <label class="name-field">
+            <span>Your name</span>
+            <input id="heroName" type="text" placeholder="Your name" maxlength="18" />
+          </label>
+        </div>
+      </section>
+
+      <section class="screen picker-screen" data-screen="companion">
+        <div class="phone-frame picker-frame">
+          <header class="picker-header">
+            <h1>Choose your<br />companion</h1>
+            <button class="round-next" type="button" aria-label="Enter homebase">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h13M13 6l6 6-6 6" />
+              </svg>
+            </button>
+          </header>
+          <div class="carousel" id="companionCarousel"></div>
+          <div class="selected-name" id="companionName">Froderick</div>
+        </div>
+      </section>
+
+      <section class="screen home-screen" data-screen="home">
+        <div class="phone-frame home-frame">
+          <nav class="home-nav" aria-label="Homebase shortcuts">
+            <button class="shortcut shortcut-team" type="button" aria-label="Together"></button>
+            <button class="shortcut shortcut-book" type="button" aria-label="Quest log"></button>
+            <button class="shortcut shortcut-map" type="button" aria-label="Map"></button>
+            <button class="shortcut shortcut-pack" type="button" aria-label="Inventory"></button>
+          </nav>
+          <div class="level-label">lv. 1</div>
+          <div class="home-art">
+            <div class="home-character" id="homeCharacter"></div>
+            <div class="home-companion" id="homeCompanion"></div>
+          </div>
+          <div class="home-message" id="homeMessage"></div>
+          <button class="home-cta" type="button">
+            <span class="home-cta-icon" aria-hidden="true"></span>
+            <span class="home-cta-label">What’s over there?</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="screen demon-screen" data-screen="demons">
+        <div class="phone-frame demons-frame">
+          <button class="round-back" type="button" aria-label="Back to home">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 12H6M11 6l-6 6 6 6" />
+            </svg>
+          </button>
+          <h1>What's lurking in<br />the shadow?</h1>
+          <section class="featured-demon" id="featuredDemon" aria-label="Featured demon"></section>
+          <div class="demon-grid" id="demonGrid" aria-label="Demon quests"></div>
+        </div>
+      </section>
+
+      <section class="screen battle-screen" data-screen="battle">
+        <div class="phone-frame battle-frame" id="battleFrame"></div>
+      </section>
+
+      <section class="screen result-screen" data-screen="result">
+        <div class="phone-frame result-frame" id="resultFrame"></div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
